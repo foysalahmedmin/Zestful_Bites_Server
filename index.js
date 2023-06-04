@@ -1,5 +1,6 @@
 const express = require('express')
 const { MongoClient, ServerApiVersion } = require('mongodb');
+const jwt = require('jsonwebtoken');
 const app = express()
 const cors = require('cors')
 require('dotenv').config()
@@ -11,6 +12,19 @@ app.use(express.json())
 
 const verifyJWT = (req, res, next) => {
   const authorization = req.headers.authorization ;
+  if(!authorization){
+    return res.status(401).send({error: true, message: 'unauthorized access'})
+  }
+
+  const token = authorization.split(' ')[1];
+
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if(err) {
+      return res.status(401).send({error: true, message: 'unauthorized access'})
+    }
+    req.decoded = decoded;
+    next();
+  })
 }
 
 
@@ -30,7 +44,15 @@ async function run() {
     // await client.connect();
     const database = client.db("ZestfulDB");
     const MenuCollection = database.collection("MenuCollection");
-    // const ReviewCollection = database.collection("ReviewMenuCollection");
+    const ReviewCollection = database.collection("ReviewMenuCollection");
+
+    //jwt
+    app.post('jwt', (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '12h'})
+      res.send({token})
+    })
+
     app.get('/menu', async (req, res) => {
       const result = await MenuCollection.find().toArray()
       res.send(result)
